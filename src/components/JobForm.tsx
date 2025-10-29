@@ -194,7 +194,30 @@ const JobForm: React.FC<JobFormProps> = ({ job, onSubmit, onCancel, isEditing = 
     </div>
   )}
 
-  {/* Add New Issue */}
+      {/* Common Issues Dropdown */}
+      <div className="space-y-1">
+        <Label>Select Common Issue</Label>
+        <Select
+          onValueChange={(value) => addIssue(value)}
+          disabled={formData.issues.length >= 5}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Choose a common issue" />
+          </SelectTrigger>
+          <SelectContent>
+            {commonIssues.map((issue) => (
+              <SelectItem
+                key={issue}
+                value={issue}
+                disabled={formData.issues.includes(issue)}
+              >
+                {issue}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {/* Add New Issue */}
   {formData.issues.length < 5 && (
     <div className="space-y-3">
       {/* Custom Issue Input */}
@@ -219,47 +242,31 @@ const JobForm: React.FC<JobFormProps> = ({ job, onSubmit, onCancel, isEditing = 
           <Plus className="h-4 w-4" />
         </Button>
       </div>
-
-      {/* Common Issues Dropdown */}
-      <div className="space-y-1">
-        <Label>Select Common Issue</Label>
-        <Select
-          onValueChange={(value) => addIssue(value)}
-          disabled={formData.issues.length >= 5}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Choose a common issue" />
-          </SelectTrigger>
-          <SelectContent>
-            {commonIssues.map((issue) => (
-              <SelectItem
-                key={issue}
-                value={issue}
-                disabled={formData.issues.includes(issue)}
-              >
-                {issue}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
     </div>
   )}
 </div>
 
-
           {/* Staff & Cost */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="attendedBy">Attended By *</Label>
-              <Input
-                id="attendedBy"
-                value={formData.attendedBy}
-                onChange={(e) => handleInputChange('attendedBy', e.target.value)}
-                placeholder="Engineer/Technician name"
-                required
-              />
-            </div>
+  <Label htmlFor="attendedBy">Attended By *</Label>
+  <select
+    id="attendedBy"
+    value={formData.attendedBy}
+    onChange={(e) => handleInputChange('attendedBy', e.target.value)}
+    required
+    className="w-full border rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+  >
+    <option value="">Select Staff</option>
+    <option value="Akash">Akash</option>
+    <option value="Aditya">Aditya</option>
+    <option value="Arbaz">Arbaz</option>
+    <option value="Adnan">Adnan</option>
+    <option value="Fhejan">Fhejan</option>
+    <option value="Israr">Israr</option>
+    <option value="Praveen">Praveen</option>
+  </select>
+</div>
             
             <div className="space-y-2">
               <Label htmlFor="estimatedCost">Estimated Repair Cost (₹) *</Label>
