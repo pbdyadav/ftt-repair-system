@@ -19,7 +19,7 @@ interface JobFormProps {
 interface FormData {
   customerName: string;
   contactNumber: string;
-  deviceType: 'Laptop' | 'Desktop' | 'Server' | 'Printer' | 'Monitor';
+  deviceType: 'Laptop' | 'Desktop' | 'DVR' | 'NVR' | 'Server' | 'Printer' | 'Monitor';
   brandName: string;
   issues: string[];
   attendedBy: string;
@@ -29,7 +29,7 @@ interface FormData {
 }
 
 const brands = [
-  'Dell', 'HP', 'Lenovo', 'Asus', 'Acer', 'Apple', 'MSI', 'Toshiba', 'Sony', 'Samsung', 'Other'
+  'Dell', 'HP', 'Lenovo', 'Asus', 'Acer', 'Apple', 'MSI', 'Toshiba', 'Sony', 'Samsung', 'Hikvision', 'Dahua', 'Bosch', 'CP-Plus', 'Other'
 ];
 
 const commonIssues = [
@@ -153,6 +153,8 @@ const JobForm: React.FC<JobFormProps> = ({ job, onSubmit, onCancel, isEditing = 
                   <SelectItem value="Server">Server</SelectItem>
                   <SelectItem value="Printer">Printer</SelectItem>
                   <SelectItem value="Monitor">Monitor</SelectItem>
+                  <SelectItem value="DVR">DVR</SelectItem>
+                  <SelectItem value="NVR">NVR</SelectItem>
                 </SelectContent>
               </Select>
             </div>
