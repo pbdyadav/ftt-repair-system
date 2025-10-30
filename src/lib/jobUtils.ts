@@ -84,9 +84,11 @@ export const saveJob = async (job: Job): Promise<void> => {
 
     // ✅ Ensure issues stored cleanly
     const jobToSave = {
-      ...job,
-      issues: Array.isArray(job.issues) ? job.issues.join(', ') : job.issues,
-    };
+  ...job,
+  issues: Array.isArray(job.issues) ? job.issues.join(', ') : job.issues,
+  estimatedCost: job.estimatedCost ? Number(job.estimatedCost) : 0,
+  finalCost: job.finalCost ? Number(job.finalCost) : null,
+};
 
     // ✅ Insert or update job
     let response;
@@ -169,9 +171,9 @@ export const sendWhatsAppNotification = (
     let message = '';
 
     if (type === 'created') {
-      message = `Dear ${job.customerName}, your ${job.deviceType} has been received at FTT Repairing Center. Your Job Sheet No. is ${job.jobSheetNumber}. We'll contact you once the repair is complete.`;
+      message = `Dear ${job.customerName}, your ${job.deviceType} has been received at FTT Repairing Center. Your Job Sheet No. is ${job.jobSheetNumber}. The estimated repair cost is ₹${job.estimatedCost ?? 0}. We'll contact you once the repair is complete.`;
     } else if (type === 'completed') {
-      message = `Dear ${job.customerName}, your ${job.deviceType} repair is complete. The final cost is ₹${job.finalCost ?? 0}. Thank you for your patience!`;
+      message = `Dear ${job.customerName}, your ${job.deviceType} repair is complete. The final cost is ₹${job.finalCost ?? 0}. Thank you for your patience! Now you can collect your product`;
     } else if (type === 'delivered') {
       message = `Dear ${job.customerName}, your ${job.deviceType} has been successfully delivered. Thank you for choosing FTT Repairing Center!`;
     }
