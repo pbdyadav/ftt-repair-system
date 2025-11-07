@@ -267,6 +267,8 @@ const JobForm: React.FC<JobFormProps> = ({ job, onSubmit, onCancel, isEditing = 
     <option value="Fhejan">Faizan</option>
     <option value="Israr">Israr</option>
     <option value="Praveen">Praveen</option>
+    <option value="Aparna">Praveen</option>
+    <option value="Nikhil">Praveen</option>
   </select>
 </div>
             
