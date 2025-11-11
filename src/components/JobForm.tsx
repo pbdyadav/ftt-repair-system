@@ -29,7 +29,7 @@ interface FormData {
 }
 
 const brands = [
-  'Dell', 'HP', 'Lenovo', 'Asus', 'Acer', 'Apple', 'MSI', 'Toshiba', 'Sony', 'Samsung', 'Hikvision', 'Dahua', 'Bosch', 'CP-Plus', 'Other'
+  'Dell', 'HP', 'Lenovo', 'Asus', 'Acer', 'Apple', 'MSI', 'Toshiba', 'Sony', 'Samsung', 'Hikvision', 'Dahua', 'Bosch', 'CP-Plus', 'D-Link', 'Netgear', 'Other'
 ];
 
 const commonIssues = [
@@ -37,6 +37,7 @@ const commonIssues = [
   'Screen damage',
   'Keyboard not working',
   'Battery not charging',
+  'Hingesh Issue',
   'Overheating',
   'Slow performance',
   'Blue screen error',
@@ -57,7 +58,9 @@ const commonIssues = [
   'Operating system reinstall',
   'No power on',
   'USB ports not working',
-  'Display cable issue'
+  'Display cable issue',
+  'CCTV Installation',
+  'Networking'
 ];
 
 const JobForm: React.FC<JobFormProps> = ({ job, onSubmit, onCancel, isEditing = false }) => {
@@ -155,6 +158,7 @@ const JobForm: React.FC<JobFormProps> = ({ job, onSubmit, onCancel, isEditing = 
                   <SelectItem value="Monitor">Monitor</SelectItem>
                   <SelectItem value="DVR">DVR</SelectItem>
                   <SelectItem value="NVR">NVR</SelectItem>
+                  <SelectItem value="On_Site_Service">On Site Service</SelectItem>
                 </SelectContent>
               </Select>
             </div>
