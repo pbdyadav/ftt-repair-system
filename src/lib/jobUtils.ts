@@ -51,7 +51,7 @@ export const getStoredJobs = async (): Promise<Job[]> => {
    =========================================================== */
 export const saveJob = async (job: Job): Promise<void> => {
   try {
-    const isNew = !job.id;
+    const isNew = !job.id || job.id === "";
 
     if (isNew) {
       job.id = crypto.randomUUID();
@@ -113,24 +113,29 @@ export const saveJob = async (job: Job): Promise<void> => {
     console.log('✅ Job saved successfully:', response.data);
 
     // 🔹 Send WhatsApp based on job type or status
-const savedJob =
-  response.data && response.data.length > 0
-    ? response.data[0]
-    : job;
+    const savedJob =
+      response.data && response.data.length > 0
+        ? response.data[0]
+        : job;
 
-if (isNew) {
-  try {
-    console.log("🔄 Generating Job Card for new job...");
+          const isNewJob = !existingJob;
+    if (isNewJob) {
+      try {
+        console.log("🔄 Generating Job Card for new job...");
 
-    // STEP 1 — Generate image + upload to Supabase
-    const imageURL =
-      await generateJobSheetImageAndUpload(savedJob);
+        // Ensure Job Sheet Number exists before generating image
+        if (!savedJob.jobSheetNumber) {
+          savedJob.jobSheetNumber = await generateJobSheetNumber();
+        }
+        // STEP 1 — Generate image + upload to Supabase
+        const imageURL =
+          await generateJobSheetImageAndUpload(savedJob);
 
-    console.log("✅ Job Card URL:", imageURL);
+        console.log("✅ Job Card URL:", imageURL);
 
-    // STEP 2 — Send WhatsApp with URL
-    if (imageURL) {
-      const message = `Dear ${savedJob.customerName},
+        // STEP 2 — Send WhatsApp with URL
+        if (imageURL) {
+          const message = `Dear ${savedJob.customerName},
 
 Your ${savedJob.deviceType} has been received at FTT Repairing Center.
 
@@ -141,44 +146,44 @@ ${imageURL}
 
 Thank you for choosing FTT Repairing Center.`;
 
-      const phone =
-        savedJob.contactNumber?.replace(/\D/g, "");
+          const phone =
+            savedJob.contactNumber?.replace(/\D/g, "");
 
-      if (phone) {
-        const encodedMessage =
-          encodeURIComponent(message);
+          if (phone) {
+            const encodedMessage =
+              encodeURIComponent(message);
 
-        const whatsappURL =
-          `https://wa.me/91${phone}?text=${encodedMessage}`;
+            const whatsappURL =
+              `https://wa.me/91${phone}?text=${encodedMessage}`;
 
-        window.open(whatsappURL, "_blank");
+            window.open(whatsappURL, "_blank");
+          }
+        } else {
+          console.error(
+            "❌ Job Card URL not generated"
+          );
+        }
+      } catch (error) {
+        console.error(
+          "⚠️ Auto job card send error:",
+          error
+        );
       }
-    } else {
-      console.error(
-        "❌ Job Card URL not generated"
+    } else if (
+      savedJob.status?.toLowerCase() === "completed"
+    ) {
+      sendWhatsAppNotification(
+        savedJob,
+        "completed"
+      );
+    } else if (
+      savedJob.status?.toLowerCase() === "delivered"
+    ) {
+      sendWhatsAppNotification(
+        savedJob,
+        "delivered"
       );
     }
-  } catch (error) {
-    console.error(
-      "⚠️ Auto job card send error:",
-      error
-    );
-  }
-} else if (
-  savedJob.status?.toLowerCase() === "completed"
-) {
-  sendWhatsAppNotification(
-    savedJob,
-    "completed"
-  );
-} else if (
-  savedJob.status?.toLowerCase() === "delivered"
-) {
-  sendWhatsAppNotification(
-    savedJob,
-    "delivered"
-  );
-}
   } catch (error) {
     console.error('⚠️ Error saving job:', error);
   }
@@ -253,23 +258,23 @@ export const sendWhatsAppNotification = (
   }
 };
 
-    /* ===========================================================
-   🔹 6. Filter Jobs (for dashboard filters)
-   =========================================================== */
-      interface JobFilters {
-      status?: Job['status'];
-      engineerName?: string;
-      searchTerm?: string;
-      dateRange?: { start: Date; end: Date };
-      }
+/* ===========================================================
+🔹 6. Filter Jobs (for dashboard filters)
+=========================================================== */
+interface JobFilters {
+  status?: Job['status'];
+  engineerName?: string;
+  searchTerm?: string;
+  dateRange?: { start: Date; end: Date };
+}
 
-      export const filterJobs = (jobs: Job[], filters: JobFilters): Job[] => {
-      return jobs.filter((job) => {
-      if (filters.status && job.status !== filters.status) return false;
-      if (filters.engineerName && job.attendedBy !== filters.engineerName)
+export const filterJobs = (jobs: Job[], filters: JobFilters): Job[] => {
+  return jobs.filter((job) => {
+    if (filters.status && job.status !== filters.status) return false;
+    if (filters.engineerName && job.attendedBy !== filters.engineerName)
       return false;
 
-      if (filters.searchTerm) {
+    if (filters.searchTerm) {
       const s = filters.searchTerm.toLowerCase();
       const matches =
         job.customerName.toLowerCase().includes(s) ||
@@ -277,9 +282,9 @@ export const sendWhatsAppNotification = (
         job.contactNumber.includes(s) ||
         job.brandName.toLowerCase().includes(s);
       if (!matches) return false;
-      }
+    }
 
-      if (filters.dateRange) {
+    if (filters.dateRange) {
       const jobDate = new Date(job.createdAt);
       if (
         jobDate < filters.dateRange.start ||
@@ -343,8 +348,24 @@ export const generateJobSheetImageAndUpload = async (
 
     let y = 120;
 
-    const line = (text: string) => {
-      ctx.fillText(text, 80, y);
+    const line = (text: string, maxWidth = 440) => {
+      const words = text.split(" ");
+      let currentLine = "";
+
+      for (let i = 0; i < words.length; i++) {
+        const testLine = currentLine + words[i] + " ";
+        const metrics = ctx.measureText(testLine);
+
+        if (metrics.width > maxWidth && i > 0) {
+          ctx.fillText(currentLine, 80, y);
+          currentLine = words[i] + " ";
+          y += 32;
+        } else {
+          currentLine = testLine;
+        }
+      }
+
+      ctx.fillText(currentLine, 80, y);
       y += 32;
     };
 
@@ -360,10 +381,9 @@ export const generateJobSheetImageAndUpload = async (
     line(`Brand: ${job.brandName}`);
 
     line(
-      `Issues: ${
-        Array.isArray(job.issues)
-          ? job.issues.join(", ")
-          : job.issues
+      `Issues: ${Array.isArray(job.issues)
+        ? job.issues.join(", ")
+        : job.issues
       }`
     );
 
