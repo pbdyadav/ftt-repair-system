@@ -113,15 +113,72 @@ export const saveJob = async (job: Job): Promise<void> => {
     console.log('✅ Job saved successfully:', response.data);
 
     // 🔹 Send WhatsApp based on job type or status
-    const savedJob = response.data && response.data.length > 0 ? response.data[0] : job;
+const savedJob =
+  response.data && response.data.length > 0
+    ? response.data[0]
+    : job;
 
-    if (isNew) {
-      sendWhatsAppNotification(savedJob, 'created');
-    } else if (savedJob.status?.toLowerCase() === 'completed') {
-      sendWhatsAppNotification(savedJob, 'completed');
-    } else if (savedJob.status?.toLowerCase() === 'delivered') {
-      sendWhatsAppNotification(savedJob, 'delivered');
+if (isNew) {
+  try {
+    console.log("🔄 Generating Job Card for new job...");
+
+    // STEP 1 — Generate image + upload to Supabase
+    const imageURL =
+      await generateJobSheetImageAndUpload(savedJob);
+
+    console.log("✅ Job Card URL:", imageURL);
+
+    // STEP 2 — Send WhatsApp with URL
+    if (imageURL) {
+      const message = `Dear ${savedJob.customerName},
+
+Your ${savedJob.deviceType} has been received at FTT Repairing Center.
+
+Job Sheet No: ${savedJob.jobSheetNumber}
+
+Download your Job Card:
+${imageURL}
+
+Thank you for choosing FTT Repairing Center.`;
+
+      const phone =
+        savedJob.contactNumber?.replace(/\D/g, "");
+
+      if (phone) {
+        const encodedMessage =
+          encodeURIComponent(message);
+
+        const whatsappURL =
+          `https://wa.me/91${phone}?text=${encodedMessage}`;
+
+        window.open(whatsappURL, "_blank");
+      }
+    } else {
+      console.error(
+        "❌ Job Card URL not generated"
+      );
     }
+  } catch (error) {
+    console.error(
+      "⚠️ Auto job card send error:",
+      error
+    );
+  }
+} else if (
+  savedJob.status?.toLowerCase() === "completed"
+) {
+  sendWhatsAppNotification(
+    savedJob,
+    "completed"
+  );
+} else if (
+  savedJob.status?.toLowerCase() === "delivered"
+) {
+  sendWhatsAppNotification(
+    savedJob,
+    "delivered"
+  );
+}
   } catch (error) {
     console.error('⚠️ Error saving job:', error);
   }
@@ -196,23 +253,23 @@ export const sendWhatsAppNotification = (
   }
 };
 
-/* ===========================================================
+    /* ===========================================================
    🔹 6. Filter Jobs (for dashboard filters)
    =========================================================== */
-interface JobFilters {
-  status?: Job['status'];
-  engineerName?: string;
-  searchTerm?: string;
-  dateRange?: { start: Date; end: Date };
-}
+      interface JobFilters {
+      status?: Job['status'];
+      engineerName?: string;
+      searchTerm?: string;
+      dateRange?: { start: Date; end: Date };
+      }
 
-export const filterJobs = (jobs: Job[], filters: JobFilters): Job[] => {
-  return jobs.filter((job) => {
-    if (filters.status && job.status !== filters.status) return false;
-    if (filters.engineerName && job.attendedBy !== filters.engineerName)
+      export const filterJobs = (jobs: Job[], filters: JobFilters): Job[] => {
+      return jobs.filter((job) => {
+      if (filters.status && job.status !== filters.status) return false;
+      if (filters.engineerName && job.attendedBy !== filters.engineerName)
       return false;
 
-    if (filters.searchTerm) {
+      if (filters.searchTerm) {
       const s = filters.searchTerm.toLowerCase();
       const matches =
         job.customerName.toLowerCase().includes(s) ||
@@ -220,9 +277,9 @@ export const filterJobs = (jobs: Job[], filters: JobFilters): Job[] => {
         job.contactNumber.includes(s) ||
         job.brandName.toLowerCase().includes(s);
       if (!matches) return false;
-    }
+      }
 
-    if (filters.dateRange) {
+      if (filters.dateRange) {
       const jobDate = new Date(job.createdAt);
       if (
         jobDate < filters.dateRange.start ||
@@ -233,4 +290,125 @@ export const filterJobs = (jobs: Job[], filters: JobFilters): Job[] => {
 
     return true;
   });
+};
+/* ===========================================================
+   🔹 7. Generate Job Card Image + Upload to Supabase
+   =========================================================== */
+
+export const generateJobSheetImageAndUpload = async (
+  job: Job
+): Promise<string | null> => {
+  try {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = 600;
+    canvas.height = 700;
+
+    if (!ctx) return null;
+
+    // Background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Load logo watermark
+    const logo = new Image();
+    logo.src = "/logo.png";
+
+    await new Promise((resolve) => {
+      logo.onload = resolve;
+    });
+
+    // Watermark settings
+    const watermarkWidth = canvas.width * 0.25;
+
+    const watermarkHeight =
+      (logo.height / logo.width) * watermarkWidth;
+
+    ctx.globalAlpha = 0.12;
+
+    ctx.drawImage(
+      logo,
+      canvas.width / 2 - watermarkWidth / 2,
+      canvas.height / 2 - watermarkHeight / 2,
+      watermarkWidth,
+      watermarkHeight
+    );
+
+    ctx.globalAlpha = 1;
+
+    // Text settings
+    ctx.fillStyle = "#000";
+    ctx.font = "20px Arial";
+
+    let y = 120;
+
+    const line = (text: string) => {
+      ctx.fillText(text, 80, y);
+      y += 32;
+    };
+
+    ctx.font = "bold 28px Arial";
+    ctx.fillText("FTT Repair Job Card", 220, 60);
+
+    ctx.font = "20px Arial";
+
+    line(`Job Sheet No: ${job.jobSheetNumber}`);
+    line(`Customer: ${job.customerName}`);
+    line(`Phone: ${job.contactNumber}`);
+    line(`Device: ${job.deviceType}`);
+    line(`Brand: ${job.brandName}`);
+
+    line(
+      `Issues: ${
+        Array.isArray(job.issues)
+          ? job.issues.join(", ")
+          : job.issues
+      }`
+    );
+
+    line(`Estimated Cost: ₹${job.estimatedCost ?? 0}`);
+    line(`Status: ${job.status}`);
+
+    // Convert to compressed JPEG
+    const blob: Blob | null = await new Promise(
+      (resolve) => {
+        canvas.toBlob(
+          (b) => resolve(b),
+          "image/jpeg",
+          0.7
+        );
+      }
+    );
+
+    if (!blob) return null;
+
+    const fileName =
+      job.jobSheetNumber +
+      "_" +
+      Date.now() +
+      ".jpg";
+
+    // Upload to Supabase Storage
+    const { error } = await supabase.storage
+      .from("jobcards")
+      .upload(fileName, blob, {
+        contentType: "image/jpeg",
+      });
+
+    if (error) {
+      console.error("Upload error:", error);
+      return null;
+    }
+
+    // Get public URL
+    const { data } = supabase.storage
+      .from("jobcards")
+      .getPublicUrl(fileName);
+
+    return data.publicUrl;
+  } catch (error) {
+    console.error("Image generation error:", error);
+    return null;
+  }
 };

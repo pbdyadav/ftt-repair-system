@@ -4,6 +4,7 @@ import JobCard from '@/components/JobCard';
 import JobForm from '@/components/JobForm';
 import { Job } from '@/types/job';
 import { getStoredJobs, saveJob, updateJobStatus, sendWhatsAppNotification, filterJobs } from '@/lib/jobUtils';
+import { generateJobSheetImage } from '@/utils/generateJobSheetImage'; // ✅ NEW IMPORT
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { saveAs } from "file-saver";
 import Papa from "papaparse";
+
 import { 
   Search, 
   Filter, 
@@ -66,7 +68,22 @@ const Dashboard: React.FC = () => {
       if (!isNaN(cost) && cost > 0) {
         const success = await updateJobStatus(job.id, 'Completed', cost);
         if (success) {
+          
+          // ✅ NEW: Generate Job Sheet Image
+          try {
+            const imageURL = await generateJobSheetImage({ ...job, finalCost: cost });
+
+            const link = document.createElement("a");
+            link.href = imageURL;
+            link.download = `JobSheet-${job.jobSheetNumber}.png`;
+            link.click();
+          } catch (err) {
+            console.error("Job sheet image generation failed:", err);
+          }
+
+          // Existing WhatsApp notification (UNCHANGED)
           sendWhatsAppNotification({ ...job, finalCost: cost }, 'completed');
+
           const refreshedJobs = await getJobsFromSupabase();
           setJobs(refreshedJobs);
         }
@@ -89,6 +106,20 @@ const Dashboard: React.FC = () => {
 
       if (success) {
         if (jobData.status === 'Completed' && editingJob.status !== 'Completed') {
+
+          // ✅ NEW: Generate Job Sheet Image on status change
+          try {
+            const imageURL = await generateJobSheetImage(updatedJob);
+
+            const link = document.createElement("a");
+            link.href = imageURL;
+            link.download = `JobSheet-${updatedJob.jobSheetNumber}.png`;
+            link.click();
+          } catch (err) {
+            console.error("Job sheet image generation failed:", err);
+          }
+
+          // Existing WhatsApp notification (UNCHANGED)
           sendWhatsAppNotification(updatedJob, 'completed');
         }
         const refreshedJobs = await getJobsFromSupabase();
