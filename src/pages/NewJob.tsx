@@ -37,7 +37,7 @@ const NewJob: React.FC = () => {
       await saveJob(newJob);
 
       // ✅ Send WhatsApp confirmation
-      sendWhatsAppNotification(newJob, 'created');
+     // sendWhatsAppNotification(newJob, 'created');
 
       // ✅ Redirect to dashboard
       navigate('/dashboard');

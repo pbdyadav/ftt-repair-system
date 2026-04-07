@@ -149,8 +149,10 @@ Thank you for choosing FTT Repairing Center.`;
       if (!isNaN(cost) && cost > 0) {
         const success = await updateJobStatus(job.id, 'Completed', cost);
         if (success) {
-          sendWhatsAppNotification({ ...job, finalCost: cost }, 'completed');
-          const refreshedJobs = await getStoredJobs();
+
+          const refreshedJobs =
+            await getStoredJobs();
+
           setJobs(refreshedJobs);
         }
       } else {

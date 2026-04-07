@@ -170,13 +170,6 @@ Thank you for choosing FTT Repairing Center.`;
         );
       }
     } else if (
-      savedJob.status?.toLowerCase() === "completed"
-    ) {
-      sendWhatsAppNotification(
-        savedJob,
-        "completed"
-      );
-    } else if (
       savedJob.status?.toLowerCase() === "delivered"
     ) {
       sendWhatsAppNotification(

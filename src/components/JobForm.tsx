@@ -29,7 +29,7 @@ interface FormData {
 }
 
 const brands = [
-  'Dell', 'HP', 'Lenovo', 'Epson', 'Samsung', 'Asus', 'Acer', 'Apple', 'MSI', 'Toshiba', 'Sony', 'Samsung', 'Hikvision', 'Dahua', 'Bosch', 'CP-Plus', 'D-Link', 'Netgear', 'Other'
+  'Dell', 'HP', 'Lenovo', 'Apple', 'Asus', 'Acer', 'MSI', 'Toshiba', 'Sony', 'Epson', 'Brother', 'Samsung', 'Hikvision', 'Dahua', 'Bosch', 'CP-Plus', 'D-Link', 'Netgear', 'Other'
 ];
 
 const commonIssues = [
@@ -160,7 +160,7 @@ const JobForm: React.FC<JobFormProps> = ({ job, onSubmit, onCancel, isEditing = 
                   <SelectItem value="DVR">DVR</SelectItem>
                   <SelectItem value="NVR">NVR</SelectItem>
                   <SelectItem value="Monitor">Attendance Machine</SelectItem>
-                  <SelectItem value="Monitor">ANetwork Switch</SelectItem>
+                  <SelectItem value="Monitor">Network Switch</SelectItem>
                   <SelectItem value="On_Site_Service">On Site Service</SelectItem>
                 </SelectContent>
               </Select>
