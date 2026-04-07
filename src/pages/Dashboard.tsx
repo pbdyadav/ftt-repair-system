@@ -4,7 +4,6 @@ import JobCard from '@/components/JobCard';
 import JobForm from '@/components/JobForm';
 import { Job } from '@/types/job';
 import { getStoredJobs, saveJob, updateJobStatus, sendWhatsAppNotification, filterJobs } from '@/lib/jobUtils';
-import { generateJobSheetImage } from '@/utils/generateJobSheetImage'; // ✅ NEW IMPORT
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -12,13 +11,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { saveAs } from "file-saver";
 import Papa from "papaparse";
-
-import { 
-  Search, 
-  Filter, 
-  BarChart3, 
-  Clock, 
-  CheckCircle, 
+import { generateBillAndUpload } from "@/lib/billUtils";
+import {
+  Search,
+  Filter,
+  BarChart3,
+  Clock,
+  CheckCircle,
   AlertCircle,
   Users
 } from 'lucide-react';
@@ -31,6 +30,88 @@ const Dashboard: React.FC = () => {
   const [engineerFilter, setEngineerFilter] = useState<string>('all');
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const handleDeliverJob = async (job: Job) => {
+    console.log("STEP 1 — Deliver clicked");
+
+    const paymentMode = prompt(
+      "Payment Mode? Type: Cash or Online"
+    );
+
+    if (
+      paymentMode !== "Cash" &&
+      paymentMode !== "Online"
+    ) {
+      alert("Please enter Cash or Online");
+      return;
+    }
+
+    const success = await updateJobStatus(
+      job.id,
+      "Delivered",
+      job.finalCost,
+      paymentMode
+    );
+
+    if (!success) {
+      alert("Failed to update status");
+      return;
+    }
+
+    try {
+      console.log("STEP 2 — Generating bill");
+
+      const billURL =
+        await generateBillAndUpload(job);
+
+      if (!billURL) {
+        alert("Bill upload failed");
+        return;
+      }
+
+      console.log("STEP 3 — Sending WhatsApp");
+
+      const message =
+        `Dear ${job.customerName},
+Your bill has been generated.
+
+Bill No: ${job.jobSheetNumber}
+
+Download Bill:
+${billURL}
+
+Payment Mode: ${paymentMode}
+
+Thank you for choosing FTT Repairing Center.`;
+
+      const phone =
+        job.contactNumber.replace(/\D/g, "");
+
+      const whatsappURL =
+        `https://wa.me/91${phone}?text=${encodeURIComponent(message)}`;
+
+      console.log("WhatsApp URL:", whatsappURL);
+
+      window.open(
+        whatsappURL,
+        "_blank"
+      );
+
+    } catch (err) {
+      console.error(
+        "Bill generation failed:",
+        err
+      );
+
+      alert(
+        "Bill generation error. Check console."
+      );
+    }
+
+    const refreshedJobs =
+      await getStoredJobs();
+
+    setJobs(refreshedJobs);
+  };
 
   // ✅ Load jobs from Supabase on mount
   useEffect(() => {
@@ -62,29 +143,14 @@ const Dashboard: React.FC = () => {
   // ✅ Mark job as completed
   const handleCompleteJob = async (job: Job) => {
     const finalCost = prompt(`Enter final repair cost for ${job.jobSheetNumber}:`, job.estimatedCost.toString());
-    
+
     if (finalCost !== null) {
       const cost = parseFloat(finalCost);
       if (!isNaN(cost) && cost > 0) {
         const success = await updateJobStatus(job.id, 'Completed', cost);
         if (success) {
-          
-          // ✅ NEW: Generate Job Sheet Image
-          try {
-            const imageURL = await generateJobSheetImage({ ...job, finalCost: cost });
-
-            const link = document.createElement("a");
-            link.href = imageURL;
-            link.download = `JobSheet-${job.jobSheetNumber}.png`;
-            link.click();
-          } catch (err) {
-            console.error("Job sheet image generation failed:", err);
-          }
-
-          // Existing WhatsApp notification (UNCHANGED)
           sendWhatsAppNotification({ ...job, finalCost: cost }, 'completed');
-
-          const refreshedJobs = await getJobsFromSupabase();
+          const refreshedJobs = await getStoredJobs();
           setJobs(refreshedJobs);
         }
       } else {
@@ -106,23 +172,9 @@ const Dashboard: React.FC = () => {
 
       if (success) {
         if (jobData.status === 'Completed' && editingJob.status !== 'Completed') {
-
-          // ✅ NEW: Generate Job Sheet Image on status change
-          try {
-            const imageURL = await generateJobSheetImage(updatedJob);
-
-            const link = document.createElement("a");
-            link.href = imageURL;
-            link.download = `JobSheet-${updatedJob.jobSheetNumber}.png`;
-            link.click();
-          } catch (err) {
-            console.error("Job sheet image generation failed:", err);
-          }
-
-          // Existing WhatsApp notification (UNCHANGED)
           sendWhatsAppNotification(updatedJob, 'completed');
         }
-        const refreshedJobs = await getJobsFromSupabase();
+        const refreshedJobs = await getStoredJobs();
         setJobs(refreshedJobs);
       }
 
@@ -145,9 +197,30 @@ const Dashboard: React.FC = () => {
 
   // ✅ Export to CSV
   const handleExportCSV = () => {
-    const csv = Papa.unparse(jobs);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    saveAs(blob, "repair-jobs.csv");
+    const exportData = jobs.map((job) => ({
+      JobNumber: job.jobSheetNumber,
+
+      Customer: job.customerName,
+
+      Phone: job.phone,
+
+      Status: job.status,
+
+      Amount: job.finalCost || 0,
+
+      PaymentMode: job.paymentMode || "",
+
+      Date: job.updatedAt,
+    }));
+
+    const csv = Papa.unparse(exportData);
+
+    const blob = new Blob(
+      [csv],
+      { type: "text/csv;charset=utf-8" }
+    );
+
+    saveAs(blob, "repair-jobs-accounts.csv");
   };
 
   return (
@@ -172,7 +245,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Filters */}
-        <FilterSection 
+        <FilterSection
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
           statusFilter={statusFilter}
@@ -193,7 +266,13 @@ const Dashboard: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredJobs.map(job => (
-                <JobCard key={job.id} job={job} onEdit={handleEditJob} onComplete={handleCompleteJob} />
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  onEdit={handleEditJob}
+                  onComplete={handleCompleteJob}
+                  onDeliver={handleDeliverJob}
+                />
               ))}
             </div>
           )}

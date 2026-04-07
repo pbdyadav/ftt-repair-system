@@ -13,6 +13,7 @@ export interface Job {
   createdAt: Date;
   updatedAt: Date;
   completedAt?: Date;
+  paymentMode?: "Cash" | "Online";
 }
 
 export interface Staff {

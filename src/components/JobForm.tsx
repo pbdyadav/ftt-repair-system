@@ -19,7 +19,7 @@ interface JobFormProps {
 interface FormData {
   customerName: string;
   contactNumber: string;
-  deviceType: 'Laptop' | 'Desktop' | 'DVR' | 'NVR' | 'Server' | 'Printer' | 'Monitor';
+  deviceType: 'Laptop' | 'Desktop' | 'DVR' | 'NVR' | 'Server' | 'Printer' | 'Monitor' | 'Attendance Machine' | 'Network Switch';
   brandName: string;
   issues: string[];
   attendedBy: string;
@@ -29,20 +29,21 @@ interface FormData {
 }
 
 const brands = [
-  'Dell', 'HP', 'Lenovo', 'Asus', 'Acer', 'Apple', 'MSI', 'Toshiba', 'Sony', 'Samsung', 'Hikvision', 'Dahua', 'Bosch', 'CP-Plus', 'D-Link', 'Netgear', 'Other'
+  'Dell', 'HP', 'Lenovo', 'Epson', 'Samsung', 'Asus', 'Acer', 'Apple', 'MSI', 'Toshiba', 'Sony', 'Samsung', 'Hikvision', 'Dahua', 'Bosch', 'CP-Plus', 'D-Link', 'Netgear', 'Other'
 ];
 
 const commonIssues = [
   'Service',
-  'Screen damage',
-  'Keyboard not working',
-  'Battery not charging',
+  'Screen damage / change',
+  'Keyboard not working / change',
+  'Battery not charging / change',
   'Hingesh Issue',
   'Overheating',
-  'Slow performance',
-  'Blue screen error',
-  'No display',
-  'Hard drive failure',
+  'Slow Performance',
+  'Blue Screen Error',
+  'No Power On',
+  'No Display',
+  'Hard Drive Failure',
   'RAM issue',
   'Motherboard problem',
   'Power adapter issue',
@@ -56,7 +57,6 @@ const commonIssues = [
   'Fan noise',
   'Monitor flickering',
   'Operating system reinstall',
-  'No power on',
   'USB ports not working',
   'Display cable issue',
   'CCTV Installation',
@@ -156,8 +156,11 @@ const JobForm: React.FC<JobFormProps> = ({ job, onSubmit, onCancel, isEditing = 
                   <SelectItem value="Server">Server</SelectItem>
                   <SelectItem value="Printer">Printer</SelectItem>
                   <SelectItem value="Monitor">Monitor</SelectItem>
+                  <SelectItem value="Monitor">Printer</SelectItem>
                   <SelectItem value="DVR">DVR</SelectItem>
                   <SelectItem value="NVR">NVR</SelectItem>
+                  <SelectItem value="Monitor">Attendance Machine</SelectItem>
+                  <SelectItem value="Monitor">ANetwork Switch</SelectItem>
                   <SelectItem value="On_Site_Service">On Site Service</SelectItem>
                 </SelectContent>
               </Select>

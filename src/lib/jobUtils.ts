@@ -118,7 +118,7 @@ export const saveJob = async (job: Job): Promise<void> => {
         ? response.data[0]
         : job;
 
-          const isNewJob = !existingJob;
+    const isNewJob = !existingJob;
     if (isNewJob) {
       try {
         console.log("🔄 Generating Job Card for new job...");
@@ -215,12 +215,14 @@ export const updateJobStatus = async (
     if (error) throw error;
 
     // Send WhatsApp if status changed to completed or delivered
-    if (status === 'Completed' || status === 'Delivered') {
-      sendWhatsAppNotification(
-        { ...(data as Job), finalCost: finalCost ?? data.finalCost },
-        status.toLowerCase() as 'completed' | 'delivered'
-      );
-    }
+    if (status === 'Completed') {
+  sendWhatsAppNotification(
+    { ...(data as Job), finalCost: finalCost ?? data.finalCost },
+    'completed'
+  );
+}
+
+// ❌ Do NOT send WhatsApp automatically for Delivered
 
     return data;
   } catch (error) {
@@ -410,11 +412,13 @@ export const generateJobSheetImageAndUpload = async (
       ".jpg";
 
     // Upload to Supabase Storage
-    const { error } = await supabase.storage
-      .from("jobcards")
-      .upload(fileName, blob, {
-        contentType: "image/jpeg",
-      });
+    const { error } =
+      await supabase.storage
+        .from("jobcards")
+        .upload(fileName, blob, {
+          contentType: "image/jpeg",
+          upsert: true
+        });
 
     if (error) {
       console.error("Upload error:", error);

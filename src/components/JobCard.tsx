@@ -29,28 +29,29 @@ interface JobCardProps {
   job: Job;
   onEdit: (job: Job) => void;
   onComplete: (job: Job) => void;
+  onDeliver?: (job: Job) => void;
 }
 
 /* ===========================================================
    🔹 Send Job Card via WhatsApp (NEW SAFE VERSION)
    =========================================================== */
 
-const JobCard: React.FC<JobCardProps> = ({ job, onEdit, onComplete }) => {
+const JobCard: React.FC<JobCardProps> = ({ job, onEdit, onComplete, onDeliver }) => {
 
   const handleSendJobCardWhatsApp = async (job: Job) => {
-  try {
-    console.log("STEP 1 — Button clicked");
+    try {
+      console.log("STEP 1 — Button clicked");
 
-    const imageURL = await generateJobSheetImageAndUpload(job);
+      const imageURL = await generateJobSheetImageAndUpload(job);
 
-    console.log("STEP 2 — Image URL:", imageURL);
+      console.log("STEP 2 — Image URL:", imageURL);
 
-    if (!imageURL) {
-      alert("Image upload failed.");
-      return;
-    }
+      if (!imageURL) {
+        alert("Image upload failed.");
+        return;
+      }
 
-    const message = `Dear ${job.customerName},
+      const message = `Dear ${job.customerName},
 
 Your Job Card is ready.
 
@@ -61,13 +62,13 @@ ${imageURL}
 
 Thank you for choosing Furtherance Technotree.`;
 
-    openWhatsAppTo(job.contactNumber, message);
+      openWhatsAppTo(job.contactNumber, message);
 
-  } catch (error) {
-    console.error("Send Job Card error:", error);
-    alert("Failed to send job card.");
-  }
-};
+    } catch (error) {
+      console.error("Send Job Card error:", error);
+      alert("Failed to send job card.");
+    }
+  };
 
   const getStatusColor = (status: Job['status']) => {
     switch (status) {
@@ -265,6 +266,15 @@ Thank you for choosing Furtherance Technotree.`;
                 Complete
               </Button>
 
+            )}
+          {job.status === 'Completed' && (
+            <Button
+              size="sm"
+              onClick={() => onDeliver?.(job)}
+              className="flex-1 bg-gray-700 hover:bg-gray-800"
+            >
+              Delivered
+            </Button>
           )}
 
         </div>
