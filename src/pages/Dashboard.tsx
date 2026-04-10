@@ -24,12 +24,19 @@ import {
 
 const Dashboard: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [engineerFilter, setEngineerFilter] = useState<string>('all');
-  const [editingJob, setEditingJob] = useState<Job | null>(null);
-  const [showEditDialog, setShowEditDialog] = useState(false);
+const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
+
+const [searchTerm, setSearchTerm] = useState('');
+const [statusFilter, setStatusFilter] = useState<string>('all');
+const [engineerFilter, setEngineerFilter] = useState<string>('all');
+
+const [dateRange, setDateRange] = useState({
+  start: '',
+  end: '',
+});
+
+const [editingJob, setEditingJob] = useState<Job | null>(null);
+const [showEditDialog, setShowEditDialog] = useState(false);
   const handleDeliverJob = async (job: Job) => {
     console.log("STEP 1 — Deliver clicked");
 
@@ -125,14 +132,63 @@ Thank you for choosing FTT Repairing Center.`;
 
   // ✅ Apply filters whenever data changes
   useEffect(() => {
-    const filters = {
-      status: statusFilter !== 'all' ? statusFilter : undefined,
-      engineerName: engineerFilter !== 'all' ? engineerFilter : undefined,
-      searchTerm: searchTerm.trim() || undefined,
-    };
-    const filtered = filterJobs(jobs, filters);
-    setFilteredJobs(filtered);
-  }, [jobs, searchTerm, statusFilter, engineerFilter]);
+  const filters = {
+    status:
+      statusFilter !== 'all'
+        ? statusFilter
+        : undefined,
+
+    engineerName:
+      engineerFilter !== 'all'
+        ? engineerFilter
+        : undefined,
+
+    searchTerm:
+      searchTerm.trim() || undefined,
+  };
+
+  let filtered = filterJobs(
+    jobs,
+    filters
+  );
+
+  // DATE FILTER START
+  if (dateRange.start) {
+    const start = new Date(
+      dateRange.start
+    );
+
+    filtered = filtered.filter(
+      (job) =>
+        new Date(job.createdAt) >=
+        start
+    );
+  }
+
+  if (dateRange.end) {
+    const end = new Date(
+      dateRange.end
+    );
+
+    end.setHours(23, 59, 59);
+
+    filtered = filtered.filter(
+      (job) =>
+        new Date(job.createdAt) <=
+        end
+    );
+  }
+  // DATE FILTER END
+
+  setFilteredJobs(filtered);
+
+}, [
+  jobs,
+  searchTerm,
+  statusFilter,
+  engineerFilter,
+  dateRange
+]);
 
   // ✅ Edit existing job
   const handleEditJob = (job: Job) => {
@@ -142,24 +198,35 @@ Thank you for choosing FTT Repairing Center.`;
 
   // ✅ Mark job as completed
   const handleCompleteJob = async (job: Job) => {
-    const finalCost = prompt(`Enter final repair cost for ${job.jobSheetNumber}:`, job.estimatedCost.toString());
+  const finalCost = prompt(
+    `Enter final repair cost for ${job.jobSheetNumber}:`,
+    job.estimatedCost.toString()
+  );
 
-    if (finalCost !== null) {
-      const cost = parseFloat(finalCost);
-      if (!isNaN(cost) && cost > 0) {
-        const success = await updateJobStatus(job.id, 'Completed', cost);
-        if (success) {
+  if (finalCost !== null) {
+    const cost = parseFloat(finalCost);
 
-          const refreshedJobs =
-            await getStoredJobs();
+    if (!isNaN(cost) && cost >= 0) {
+      const success = await updateJobStatus(
+        job.id,
+        'Completed',
+        cost
+      );
 
-          setJobs(refreshedJobs);
-        }
-      } else {
-        alert('Please enter a valid cost amount.');
+      if (success) {
+        const refreshedJobs =
+          await getStoredJobs();
+
+        setJobs(refreshedJobs);
       }
+
+    } else {
+      alert(
+        'Please enter a valid cost amount (0 or more).'
+      );
     }
-  };
+  }
+};
 
   // ✅ Update job details (edit form)
   const handleUpdateJob = async (jobData: Partial<Job>) => {
@@ -199,31 +266,46 @@ Thank you for choosing FTT Repairing Center.`;
 
   // ✅ Export to CSV
   const handleExportCSV = () => {
-    const exportData = jobs.map((job) => ({
+  const exportData = jobs
+    .filter((job) => job.status === "Delivered")
+    .map((job) => ({
       JobNumber: job.jobSheetNumber,
 
       Customer: job.customerName,
 
-      Phone: job.phone,
+      Phone: job.contactNumber || "",
 
       Status: job.status,
 
-      Amount: job.finalCost || 0,
+      Amount:
+  job.finalCost === 0
+    ? "FOC"
+    : job.finalCost || 0,
 
       PaymentMode: job.paymentMode || "",
 
-      Date: job.updatedAt,
+      PaymentDate: job.paymentDate
+        ? new Date(job.paymentDate).toLocaleString()
+        : "",
+
+      DeliveredDate: job.updatedAt
+        ? new Date(job.updatedAt).toLocaleString()
+        : "",
+
+      Engineer: job.attendedBy || "",
+
+      Device: job.deviceType || "",
     }));
 
-    const csv = Papa.unparse(exportData);
+  const csv = Papa.unparse(exportData);
 
-    const blob = new Blob(
-      [csv],
-      { type: "text/csv;charset=utf-8" }
-    );
+  const blob = new Blob(
+    [csv],
+    { type: "text/csv;charset=utf-8" }
+  );
 
-    saveAs(blob, "repair-jobs-accounts.csv");
-  };
+  saveAs(blob, "repair-jobs-accounts.csv");
+};
 
   return (
     <Layout>
@@ -248,14 +330,20 @@ Thank you for choosing FTT Repairing Center.`;
 
         {/* Filters */}
         <FilterSection
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-          engineerFilter={engineerFilter}
-          setEngineerFilter={setEngineerFilter}
-          engineers={engineers}
-        />
+  searchTerm={searchTerm}
+  setSearchTerm={setSearchTerm}
+
+  statusFilter={statusFilter}
+  setStatusFilter={setStatusFilter}
+
+  engineerFilter={engineerFilter}
+  setEngineerFilter={setEngineerFilter}
+
+  dateRange={dateRange}
+  setDateRange={setDateRange}
+
+  engineers={engineers}
+/>
 
         {/* Jobs */}
         <div className="space-y-4">
@@ -312,11 +400,25 @@ const StatCard = ({ icon, label, value, color }: any) => (
   </Card>
 );
 
-const FilterSection = ({ searchTerm, setSearchTerm, statusFilter, setStatusFilter, engineerFilter, setEngineerFilter, engineers }: any) => (
+const FilterSection = ({
+  searchTerm,
+  setSearchTerm,
+
+  statusFilter,
+  setStatusFilter,
+
+  engineerFilter,
+  setEngineerFilter,
+
+  dateRange,
+  setDateRange,
+
+  engineers
+}: any) => (
   <Card>
     <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Filter className="h-5 w-5" />Filters & Search</CardTitle></CardHeader>
     <CardContent>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {/* Search */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Search</label>
@@ -342,9 +444,9 @@ const FilterSection = ({ searchTerm, setSearchTerm, statusFilter, setStatusFilte
         </div>
 
         {/* Engineer */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Engineer</label>
-          <Select value={engineerFilter} onValueChange={setEngineerFilter}>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Engineer</label>
+            <Select value={engineerFilter} onValueChange={setEngineerFilter}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Engineers</SelectItem>
@@ -352,9 +454,44 @@ const FilterSection = ({ searchTerm, setSearchTerm, statusFilter, setStatusFilte
                 <SelectItem key={engineer} value={engineer}>{engineer}</SelectItem>
               ))}
             </SelectContent>
-          </Select>
+            </Select>
+            </div>
+              {/* Start Date */}
+<div className="space-y-2">
+  <label className="text-sm font-medium">
+    Start Date
+  </label>
+
+  <Input
+    type="date"
+    value={dateRange.start}
+    onChange={(e) =>
+      setDateRange({
+        ...dateRange,
+        start: e.target.value,
+      })
+    }
+  />
+</div>
+
+{/* End Date */}
+<div className="space-y-2">
+  <label className="text-sm font-medium">
+    End Date
+  </label>
+
+  <Input
+    type="date"
+    value={dateRange.end}
+    onChange={(e) =>
+      setDateRange({
+        ...dateRange,
+        end: e.target.value,
+      })
+    }
+  />
+</div>
         </div>
-      </div>
     </CardContent>
   </Card>
 );

@@ -188,15 +188,32 @@ Thank you for choosing FTT Repairing Center.`;
 export const updateJobStatus = async (
   jobId: string,
   status: Job['status'],
-  finalCost?: number
+  finalCost?: number,
+  paymentMode?: string
 ): Promise<Job | null> => {
   try {
     const updateFields: Partial<Job> = {
-      status,
-      finalCost,
-      updatedAt: new Date(),
-      completedAt: status === 'Completed' ? new Date() : undefined,
-    };
+  status,
+
+  finalCost,
+
+  updatedAt: new Date(),
+
+  completedAt:
+    status === 'Completed'
+      ? new Date()
+      : undefined,
+
+  paymentMode:
+    status === "Delivered"
+      ? paymentMode
+      : undefined,
+
+  paymentDate:
+    status === "Delivered"
+      ? new Date()
+      : undefined,
+};
 
     const { data, error } = await supabase
       .from('jobs')
