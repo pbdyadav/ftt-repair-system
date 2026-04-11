@@ -1,6 +1,41 @@
 import { supabase } from '@/lib/supabaseClient';
 import { Job } from '@/types/job';
 
+const normalizeServiceItems = (serviceItems: unknown) => {
+  if (Array.isArray(serviceItems)) {
+    return serviceItems
+      .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+      .map((item) => ({
+        name: typeof item.name === 'string' ? item.name : '',
+        qty: Number(item.qty) || 1,
+        price: Number(item.price) || 0,
+      }));
+  }
+
+  if (typeof serviceItems === 'string' && serviceItems.trim()) {
+    try {
+      const parsed = JSON.parse(serviceItems);
+      return normalizeServiceItems(parsed);
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+};
+
+const normalizeIssues = (issues: unknown) => {
+  if (Array.isArray(issues)) {
+    return issues.map((issue) => String(issue).trim()).filter(Boolean);
+  }
+
+  if (typeof issues === 'string' && issues.trim()) {
+    return issues.split(',').map((issue) => issue.trim()).filter(Boolean);
+  }
+
+  return [];
+};
+
 /* ===========================================================
    🔹 1. Generate Unique Job Sheet Number (FTT-00001 format)
    =========================================================== */
@@ -27,9 +62,8 @@ export const getStoredJobs = async (): Promise<Job[]> => {
   const { data, error } = await supabase.from('jobs').select('*');
   if (data) {
     data.forEach((job) => {
-      if (typeof job.issues === 'string') {
-        job.issues = job.issues.split(',').map((i) => i.trim());
-      }
+      job.issues = normalizeIssues(job.issues);
+      job.serviceItems = normalizeServiceItems(job.serviceItems);
     });
   }
 
@@ -49,7 +83,7 @@ export const getStoredJobs = async (): Promise<Job[]> => {
 /* ===========================================================
    🔹 3. Save or update a job (to Supabase) + WhatsApp
    =========================================================== */
-export const saveJob = async (job: Job): Promise<void> => {
+export const saveJob = async (job: Job): Promise<boolean> => {
   try {
     const isNew = !job.id || job.id === "";
 
@@ -69,23 +103,19 @@ export const saveJob = async (job: Job): Promise<void> => {
     }
 
     // 🧹 Clean up issues field before saving
-    if (Array.isArray(job.issues)) {
-      job.issues = job.issues.map((i) => i.trim());
-    } else if (typeof job.issues === 'string') {
-      try {
-        const parsed = JSON.parse(job.issues);
-        job.issues = Array.isArray(parsed)
-          ? parsed.map((i: string) => i.trim())
-          : [job.issues];
-      } catch {
-        job.issues = [job.issues];
-      }
-    }
+    job.issues = normalizeIssues(job.issues);
 
     // ✅ Ensure issues and cost are clean
     const jobToSave = {
       ...job,
-      issues: Array.isArray(job.issues) ? job.issues.join(', ') : job.issues,
+      issues: normalizeIssues(job.issues).join(', '),
+      serviceItems: normalizeServiceItems(job.serviceItems)
+        .map((item) => ({
+          name: item.name.trim(),
+          qty: Number(item.qty) || 0,
+          price: Number(item.price) || 0,
+        }))
+        .filter((item) => item.name && item.qty > 0),
       estimatedCost:
         job.estimatedCost && !isNaN(Number(job.estimatedCost))
           ? Number(job.estimatedCost)
@@ -94,6 +124,18 @@ export const saveJob = async (job: Job): Promise<void> => {
         job.finalCost && !isNaN(Number(job.finalCost))
           ? Number(job.finalCost)
           : null,
+      warrantyStartDate: job.warrantyStartDate?.trim()
+        ? job.warrantyStartDate
+        : null,
+      warrantyEndDate: job.warrantyEndDate?.trim()
+        ? job.warrantyEndDate
+        : null,
+      amcStartDate: job.amcStartDate?.trim()
+        ? job.amcStartDate
+        : null,
+      amcEndDate: job.amcEndDate?.trim()
+        ? job.amcEndDate
+        : null,
     };
 
     // ✅ Insert or update job
@@ -107,7 +149,7 @@ export const saveJob = async (job: Job): Promise<void> => {
     if (response.error) {
       console.error('❌ Supabase save error:', response.error.message);
       alert('❌ Failed to save job: ' + response.error.message);
-      return;
+      return false;
     }
 
     console.log('✅ Job saved successfully:', response.data);
@@ -177,8 +219,10 @@ Thank you for choosing FTT Repairing Center.`;
         "delivered"
       );
     }
+    return true;
   } catch (error) {
     console.error('⚠️ Error saving job:', error);
+    return false;
   }
 };
 
@@ -224,17 +268,27 @@ export const updateJobStatus = async (
 
     if (error) throw error;
 
+    const normalizedData: Job = {
+      ...(data as Job),
+      issues: normalizeIssues(data.issues),
+      serviceItems: normalizeServiceItems(data.serviceItems),
+      createdAt: new Date(data.createdAt),
+      updatedAt: new Date(data.updatedAt),
+      completedAt: data.completedAt ? new Date(data.completedAt) : undefined,
+      paymentDate: data.paymentDate ? new Date(data.paymentDate) : undefined,
+    };
+
     // Send WhatsApp if status changed to completed or delivered
     if (status === 'Completed') {
   sendWhatsAppNotification(
-    { ...(data as Job), finalCost: finalCost ?? data.finalCost },
+    { ...normalizedData, finalCost: finalCost ?? normalizedData.finalCost },
     'completed'
   );
 }
 
 // ❌ Do NOT send WhatsApp automatically for Delivered
 
-    return data;
+    return normalizedData;
   } catch (error) {
     console.error('Error updating job status:', error);
     return null;

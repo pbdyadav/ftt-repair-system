@@ -1,19 +1,60 @@
+export interface ServiceItem {
+  name: string;
+  qty: number;
+  price: number;
+}
+
 export interface Job {
   id: string;
   jobSheetNumber: string;
   customerName: string;
   contactNumber: string;
-  deviceType: 'Laptop' | 'Desktop';
+
+  deviceType:
+    | 'Laptop'
+    | 'Desktop'
+    | 'DVR'
+    | 'NVR'
+    | 'Server'
+    | 'Printer'
+    | 'Monitor'
+    | 'Attendance Machine'
+    | 'Network Switch'
+    | 'On_Site_Service';
+
   brandName: string;
   issues: string[];
   attendedBy: string;
+
   estimatedCost: number;
   finalCost?: number;
-  status: 'Pending' | 'In Progress' | 'Completed' | 'Delivered';
+
+  status:
+    | 'Pending'
+    | 'In Progress'
+    | 'Completed'
+    | 'Delivered';
+
   createdAt: Date;
   updatedAt: Date;
   completedAt?: Date;
+
   paymentMode?: "Cash" | "Online";
+  paymentDate?: Date;
+
+  // Service Type System
+
+  serviceType?: 'Paid' | 'FOC' | 'Under Warranty' | 'AMC';
+
+  warrantyStartDate?: string;
+  warrantyEndDate?: string;
+
+  amcStartDate?: string;
+  amcEndDate?: string;
+
+  // FUTURE MULTIPLE SERVICES (optional)
+
+  serviceItems?: ServiceItem[];
 }
 
 export interface Staff {

@@ -3,6 +3,121 @@ import { Job } from "@/types/job";
 export const generateBillImage = async (
   job: Job
 ) => {
+  const normalizeServiceItems = (serviceItems: unknown) => {
+    if (Array.isArray(serviceItems)) {
+      return serviceItems
+        .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+        .map((item) => ({
+          name: typeof item.name === "string" ? item.name.trim() : "",
+          qty: Number(item.qty) || 0,
+          price: Number(item.price) || 0,
+        }))
+        .filter((item) => item.name && item.qty > 0);
+    }
+
+    if (typeof serviceItems === "string" && serviceItems.trim()) {
+      try {
+        return normalizeServiceItems(JSON.parse(serviceItems));
+      } catch {
+        return [];
+      }
+    }
+
+    return [];
+  };
+
+  const normalizedIssues =
+    Array.isArray(job.issues)
+      ? job.issues
+      : typeof job.issues === "string" && job.issues.trim()
+        ? job.issues
+            .split(",")
+            .map((issue) => issue.trim())
+            .filter(Boolean)
+        : [];
+
+  const normalizedItems =
+    normalizeServiceItems(job.serviceItems);
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("en-IN").format(value);
+
+  const drawRightText = (
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    rightX: number,
+    y: number
+  ) => {
+    const textWidth =
+      ctx.measureText(text).width;
+
+    ctx.fillText(
+      text,
+      rightX - textWidth,
+      y
+    );
+  };
+
+  const wrapText = (
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    x: number,
+    y: number,
+    maxWidth: number,
+    lineHeight: number
+  ) => {
+    const words = text.split(" ");
+    let line = "";
+    let lines = 0;
+
+    for (let n = 0; n < words.length; n++) {
+      const testLine =
+        line + words[n] + " ";
+
+      const metrics =
+        ctx.measureText(testLine);
+
+      const testWidth =
+        metrics.width;
+
+      if (
+        testWidth > maxWidth &&
+        n > 0
+      ) {
+        ctx.fillText(
+          line,
+          x,
+          y
+        );
+
+        line =
+          words[n] + " ";
+
+        y += lineHeight;
+
+        lines++;
+      } else {
+        line = testLine;
+      }
+    }
+
+    ctx.fillText(line, x, y);
+
+    return lines + 1;
+  };
+
+  const drawRowText = (
+    text: string,
+    rightX: number,
+    y: number
+  ) => {
+    drawRightText(
+      ctx,
+      text,
+      rightX,
+      y
+    );
+  };
   const canvas =
     document.createElement("canvas");
 
@@ -28,7 +143,7 @@ export const generateBillImage = async (
     canvas.height
   );
 
-  // Watermark
+  // Logo
 
   const logo =
     new Image();
@@ -40,6 +155,8 @@ export const generateBillImage = async (
       logo.onload = resolve;
     }
   );
+
+  // Watermark
 
   const watermarkWidth =
     canvas.width * 0.25;
@@ -54,26 +171,21 @@ export const generateBillImage = async (
   ctx.drawImage(
     logo,
     canvas.width / 2 -
-      watermarkWidth / 2,
+    watermarkWidth / 2,
     canvas.height / 2 -
-      watermarkHeight / 2,
+    watermarkHeight / 2,
     watermarkWidth,
     watermarkHeight
   );
 
   ctx.globalAlpha = 1;
 
-  // Header Logo
+  // Header logo
 
   ctx.drawImage(
     logo,
-    40,
-    30,
-    80,
-    80
+    40, 30, 80, 80
   );
-
-  // Company Name
 
   ctx.fillStyle = "black";
 
@@ -82,8 +194,7 @@ export const generateBillImage = async (
 
   ctx.fillText(
     "Furtherance Technotree Pvt Ltd",
-    140,
-    60
+    140, 60
   );
 
   ctx.font =
@@ -91,154 +202,297 @@ export const generateBillImage = async (
 
   ctx.fillText(
     "UG-13, A Block Silver Mall, Indore - 452001",
-    140,
-    85
+    140, 85
   );
 
   ctx.fillText(
     "Contact: 92001 11400",
-    140,
-    105
+    140, 105
   );
 
-  // Customer details
+  // Customer
 
   ctx.fillText(
     `Customer: ${job.customerName}`,
-    50,
-    160
+    50, 160
   );
 
   ctx.fillText(
     `Phone: ${job.contactNumber}`,
-    50,
-    185
+    50, 185
   );
 
   ctx.fillText(
     `Bill Date: ${new Date().toLocaleDateString()}`,
-    500,
-    160
+    500, 160
   );
 
   ctx.fillText(
     `Bill No: ${job.jobSheetNumber}`,
-    500,
-    185
+    500, 185
   );
 
-  // Table border
+  // Service Type
 
-  ctx.strokeRect(
-    40,
-    220,
-    710,
-    200
+  ctx.fillText(
+    `Service Type: ${job.serviceType || "Paid"
+    }`,
+    50, 210
   );
 
-  // Header row
+  const tableLeft = 40;
+  const tableRight = 750;
+  const tableTop = 230;
+  const tableHeaderBottom = 270;
+  const snoRight = 120;
+  const particularRight = 450;
+  const qtyRight = 520;
+  const priceRight = 625;
+  const minimumTableBottom = 530;
+
+  // Header
 
   ctx.font =
     "bold 14px Arial";
 
   ctx.fillText(
     "S.No",
-    60,
-    250
+    60, 260
   );
 
   ctx.fillText(
     "Particular",
-    140,
-    250
+    160, 260
   );
 
   ctx.fillText(
     "Qty",
-    430,
-    250
+    460, 260
   );
 
   ctx.fillText(
     "Price",
-    500,
-    250
+    540, 260
   );
 
   ctx.fillText(
     "Amount",
-    600,
-    250
+    640, 260
   );
 
-  // Row line
+  // Header line
 
   ctx.beginPath();
 
   ctx.moveTo(
-    40,
-    260
+    tableLeft, tableHeaderBottom
   );
 
   ctx.lineTo(
-    750,
-    260
+    tableRight, tableHeaderBottom
   );
 
   ctx.stroke();
 
-  // Data row
+  // Items
+
+  let startY = 270;
+
+  let total = 0;
+
+  const items =
+    normalizedItems.length > 0
+      ? normalizedItems
+      : [
+        {
+          name:
+            normalizedIssues.join(
+              ", "
+            ) ||
+            "Repair Service",
+          qty: 1,
+          price:
+            job.finalCost || 0
+        }
+      ];
+
+  ctx.font =
+    "14px Arial";
+
+  startY = 270;
+  total = 0;
+
+  items.forEach(
+    (item, index) => {
+      const amount =
+        item.qty * item.price;
+      const rowTop =
+        startY;
+      const textTop =
+        rowTop + 26;
+
+      total += amount;
+
+      ctx.fillText(
+        (index + 1).toString(),
+        60,
+        textTop
+      );
+
+      // WRAPPED PARTICULAR TEXT
+
+      const lines =
+        wrapText(
+          ctx,
+          item.name,
+          160,
+          textTop,
+          270,
+          18
+        );
+
+      drawRowText(
+        item.qty.toString(),
+        500,
+        textTop
+      );
+
+      drawRowText(
+        `₹ ${formatCurrency(item.price)}`,
+        605,
+        textTop
+      );
+
+      drawRowText(
+        `₹ ${formatCurrency(amount)}`,
+        730,
+        textTop
+      );
+
+      const rowHeight =
+        Math.max(lines * 18 + 20, 38);
+
+      startY += rowHeight;
+
+      // Row line
+
+      ctx.beginPath();
+
+      ctx.moveTo(
+        tableLeft,
+        startY
+      );
+
+      ctx.lineTo(
+        tableRight,
+        startY
+      );
+
+      ctx.stroke();
+
+      startY += 10;
+    }
+  );
+
+  const tableBottom =
+    Math.max(startY, minimumTableBottom);
+
+  ctx.strokeRect(
+    tableLeft,
+    tableTop,
+    tableRight - tableLeft,
+    tableBottom - tableTop
+  );
+
+  ctx.beginPath();
+
+  ctx.moveTo(
+    snoRight,
+    tableTop
+  );
+  ctx.lineTo(
+    snoRight,
+    tableBottom
+  );
+
+  ctx.moveTo(
+    particularRight,
+    tableTop
+  );
+  ctx.lineTo(
+    particularRight,
+    tableBottom
+  );
+
+  ctx.moveTo(
+    qtyRight,
+    tableTop
+  );
+  ctx.lineTo(
+    qtyRight,
+    tableBottom
+  );
+
+  ctx.moveTo(
+    priceRight,
+    tableTop
+  );
+  ctx.lineTo(
+    priceRight,
+    tableBottom
+  );
+
+  ctx.stroke();
+
+  const totalBoxTop =
+    tableBottom + 24;
+  const totalBoxLeft = 420;
+  const totalBoxWidth = 330;
+  const totalBoxHeight = 48;
+
+  ctx.fillStyle = "#f5f7fb";
+  ctx.fillRect(
+    totalBoxLeft,
+    totalBoxTop,
+    totalBoxWidth,
+    totalBoxHeight
+  );
+
+  ctx.strokeRect(
+    totalBoxLeft,
+    totalBoxTop,
+    totalBoxWidth,
+    totalBoxHeight
+  );
+
+  ctx.fillStyle = "black";
+  ctx.font =
+    "bold 16px Arial";
+
+  ctx.fillText(
+    "Total Amount",
+    totalBoxLeft + 16,
+    totalBoxTop + 30
+  );
+
+  drawRightText(
+    ctx,
+    `₹ ${formatCurrency(total)}`,
+    totalBoxLeft + totalBoxWidth - 16,
+    totalBoxTop + 30
+  );
+
+  // Footer
 
   ctx.font =
     "14px Arial";
 
   ctx.fillText(
-    "1",
-    60,
-    300
+    "Authorized Signature",
+    520, totalBoxTop + 110
   );
 
-  ctx.fillText(
-    job.problemDescription ||
-      "Repair Service",
-    140,
-    300
-  );
-
-  ctx.fillText(
-    "1",
-    430,
-    300
-  );
-
-  ctx.fillText(
-    job.finalCost?.toString() ||
-      "0",
-    500,
-    300
-  );
-
-  ctx.fillText(
-    job.finalCost?.toString() ||
-      "0",
-    600,
-    300
-  );
-
-  // Total
-
-  ctx.font =
-    "bold 16px Arial";
-
-  ctx.fillText(
-    `Total Amount: ₹ ${
-      job.finalCost || 0
-    }`,
-    450,
-    460
-  );
-
-  // QR bigger
+  // QR
 
   const qr =
     new Image();
@@ -253,10 +507,7 @@ export const generateBillImage = async (
 
   ctx.drawImage(
     qr,
-    520,
-    850,
-    200,
-    200
+    520, totalBoxTop + 150, 200, 200
   );
 
   return canvas.toDataURL(

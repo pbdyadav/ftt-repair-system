@@ -52,14 +52,14 @@ const [showEditDialog, setShowEditDialog] = useState(false);
       return;
     }
 
-    const success = await updateJobStatus(
+    const deliveredJob = await updateJobStatus(
       job.id,
       "Delivered",
       job.finalCost,
       paymentMode
     );
 
-    if (!success) {
+    if (!deliveredJob) {
       alert("Failed to update status");
       return;
     }
@@ -67,8 +67,23 @@ const [showEditDialog, setShowEditDialog] = useState(false);
     try {
       console.log("STEP 2 — Generating bill");
 
+      const billJob: Job = {
+        ...job,
+        ...deliveredJob,
+        issues:
+          Array.isArray(deliveredJob.issues) &&
+          deliveredJob.issues.length > 0
+            ? deliveredJob.issues
+            : job.issues,
+        serviceItems:
+          Array.isArray(deliveredJob.serviceItems) &&
+          deliveredJob.serviceItems.length > 0
+            ? deliveredJob.serviceItems
+            : job.serviceItems,
+      };
+
       const billURL =
-        await generateBillAndUpload(job);
+        await generateBillAndUpload(billJob);
 
       if (!billURL) {
         alert("Bill upload failed");
@@ -78,10 +93,10 @@ const [showEditDialog, setShowEditDialog] = useState(false);
       console.log("STEP 3 — Sending WhatsApp");
 
       const message =
-        `Dear ${job.customerName},
+        `Dear ${deliveredJob.customerName},
 Your bill has been generated.
 
-Bill No: ${job.jobSheetNumber}
+Bill No: ${deliveredJob.jobSheetNumber}
 
 Download Bill:
 ${billURL}
@@ -91,7 +106,7 @@ Payment Mode: ${paymentMode}
 Thank you for choosing FTT Repairing Center.`;
 
       const phone =
-        job.contactNumber.replace(/\D/g, "");
+        deliveredJob.contactNumber.replace(/\D/g, "");
 
       const whatsappURL =
         `https://wa.me/91${phone}?text=${encodeURIComponent(message)}`;
@@ -149,7 +164,7 @@ Thank you for choosing FTT Repairing Center.`;
 
   let filtered = filterJobs(
     jobs,
-    filters
+    filters as any
   );
 
   // DATE FILTER START
@@ -424,7 +439,7 @@ const FilterSection = ({
           <label className="text-sm font-medium">Search</label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input placeholder="Search by name, job number, phone..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+            <Input placeholder="by name, job #, phone..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
           </div>
         </div>
 
