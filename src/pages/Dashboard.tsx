@@ -282,48 +282,108 @@ Thank you for choosing FTT Repairing Center.`;
     delivered: jobs.filter(job => job.status === 'Delivered').length,
   };
 
-  // ✅ Export to CSV
-  const handleExportCSV = () => {
-  const exportData = jobs
-    .filter((job) => job.status === "Delivered")
-    .map((job) => ({
+  const getDeliveredJobs = () =>
+    jobs.filter((job) => job.status === "Delivered");
+
+  const downloadCsvFile = (data: Record<string, string | number>[], fileName: string) => {
+    const csv = Papa.unparse(data);
+
+    const blob = new Blob(
+      [csv],
+      { type: "text/csv;charset=utf-8" }
+    );
+
+    saveAs(blob, fileName);
+  };
+
+  // ✅ Export summary CSV
+  const handleExportSummaryCSV = () => {
+    const exportData = getDeliveredJobs().map((job) => ({
       JobNumber: job.jobSheetNumber,
-
       Customer: job.customerName,
-
       Phone: job.contactNumber || "",
-
       Status: job.status,
-
+      Device: job.deviceType || "",
+      Engineer: job.attendedBy || "",
       Amount:
-  job.finalCost === 0
-    ? "FOC"
-    : job.finalCost || 0,
-
+        job.finalCost === 0
+          ? "FOC"
+          : job.finalCost || 0,
       PaymentMode: job.paymentMode || "",
-
       PaymentDate: job.paymentDate
         ? new Date(job.paymentDate).toLocaleString()
         : "",
-
       DeliveredDate: job.updatedAt
         ? new Date(job.updatedAt).toLocaleString()
         : "",
-
-      Engineer: job.attendedBy || "",
-
-      Device: job.deviceType || "",
     }));
 
-  const csv = Papa.unparse(exportData);
+    downloadCsvFile(
+      exportData,
+      "repair-jobs-summary.csv"
+    );
+  };
 
-  const blob = new Blob(
-    [csv],
-    { type: "text/csv;charset=utf-8" }
-  );
+  // ✅ Export item-wise CSV
+  const handleExportItemWiseCSV = () => {
+    const exportData = getDeliveredJobs()
+      .flatMap((job) => {
+        const normalizedItems =
+          Array.isArray(job.serviceItems) && job.serviceItems.length > 0
+            ? job.serviceItems
+            : [
+                {
+                  name: Array.isArray(job.issues)
+                    ? job.issues.join(", ")
+                    : job.issues || "Repair Service",
+                  qty: 1,
+                  price: Number(job.finalCost || job.estimatedCost || 0),
+                },
+              ];
 
-  saveAs(blob, "repair-jobs-accounts.csv");
-};
+        return normalizedItems.map((item, index) => {
+          const quantity = Number(item.qty) || 0;
+          const unitPrice = Number(item.price) || 0;
+          const itemAmount = quantity * unitPrice;
+
+          return {
+            JobNumber: job.jobSheetNumber,
+            Customer: job.customerName,
+            Phone: job.contactNumber || "",
+            Status: job.status,
+            Device: job.deviceType || "",
+            Engineer: job.attendedBy || "",
+            PaymentMode: job.paymentMode || "",
+            PaymentDate: job.paymentDate
+              ? new Date(job.paymentDate).toLocaleString()
+              : "",
+            DeliveredDate: job.updatedAt
+              ? new Date(job.updatedAt).toLocaleString()
+              : "",
+            LineNo: index + 1,
+            ItemName: item.name || "",
+            Qty: quantity,
+            UnitPrice:
+              job.finalCost === 0 && unitPrice === 0
+                ? "FOC"
+                : unitPrice,
+            ItemAmount:
+              job.finalCost === 0 && itemAmount === 0
+                ? "FOC"
+                : itemAmount,
+            JobTotal:
+              job.finalCost === 0
+                ? "FOC"
+                : job.finalCost || job.estimatedCost || 0,
+          };
+        });
+      });
+
+    downloadCsvFile(
+      exportData,
+      "repair-jobs-item-wise.csv"
+    );
+  };
 
   return (
     <Layout>
@@ -334,7 +394,14 @@ Thank you for choosing FTT Repairing Center.`;
             <h1 className="text-2xl font-bold text-gray-900">Repair Jobs Dashboard</h1>
             <p className="text-gray-600 mt-1">Manage and track all repair jobs (IMALAG Server)</p>
           </div>
-          <Button onClick={handleExportCSV}>Export CSV</Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleExportSummaryCSV}>
+              Export Summary CSV
+            </Button>
+            <Button onClick={handleExportItemWiseCSV}>
+              Export Item-wise CSV
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
