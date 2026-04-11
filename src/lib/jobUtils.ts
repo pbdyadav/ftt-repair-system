@@ -370,91 +370,263 @@ export const generateJobSheetImageAndUpload = async (
   job: Job
 ): Promise<string | null> => {
   try {
+    const loadImage = (src: string) =>
+      new Promise<HTMLImageElement>((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = src;
+      });
+
+    const roundRect = (
+      ctx: CanvasRenderingContext2D,
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      radius: number
+    ) => {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    };
+
+    const wrapText = (
+      text: string,
+      x: number,
+      y: number,
+      maxWidth: number,
+      lineHeight: number
+    ) => {
+      const words = text.split(" ");
+      let line = "";
+      let currentY = y;
+
+      words.forEach((word, index) => {
+        const testLine = `${line}${word} `;
+        const testWidth = ctx.measureText(testLine).width;
+
+        if (testWidth > maxWidth && index > 0) {
+          ctx.fillText(line.trim(), x, currentY);
+          line = `${word} `;
+          currentY += lineHeight;
+          return;
+        }
+
+        line = testLine;
+      });
+
+      if (line.trim()) {
+        ctx.fillText(line.trim(), x, currentY);
+      }
+
+      return currentY;
+    };
+
+    const drawLaptopWatermark = () => {
+      ctx.save();
+      ctx.globalAlpha = 0.04;
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = 16;
+
+      roundRect(ctx, 470, 355, 650, 360, 34);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(440, 760);
+      ctx.lineTo(1180, 760);
+      ctx.lineTo(1220, 835);
+      ctx.lineTo(400, 835);
+      ctx.closePath();
+      ctx.stroke();
+
+      ctx.restore();
+    };
+
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
 
-    canvas.width = 600;
-    canvas.height = 700;
+    canvas.width = 1600;
+    canvas.height = 1080;
 
     if (!ctx) return null;
 
-    // Background
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const [logo, themeImage, qrImage] = await Promise.all([
+      loadImage("/FTTlogo.png"),
+      loadImage("/cardtheem.png"),
+      loadImage("/fqr.png"),
+    ]);
 
-    // Load logo watermark
-    const logo = new Image();
-    logo.src = "/logo.png";
+    const formattedIssues = Array.isArray(job.issues)
+      ? job.issues.join(", ")
+      : job.issues || "-";
 
-    await new Promise((resolve) => {
-      logo.onload = resolve;
-    });
-
-    // Watermark settings
-    const watermarkWidth = canvas.width * 0.25;
-
-    const watermarkHeight =
-      (logo.height / logo.width) * watermarkWidth;
-
-    ctx.globalAlpha = 0.12;
-
-    ctx.drawImage(
-      logo,
-      canvas.width / 2 - watermarkWidth / 2,
-      canvas.height / 2 - watermarkHeight / 2,
-      watermarkWidth,
-      watermarkHeight
-    );
-
-    ctx.globalAlpha = 1;
-
-    // Text settings
-    ctx.fillStyle = "#000";
-    ctx.font = "20px Arial";
-
-    let y = 120;
-
-    const line = (text: string, maxWidth = 440) => {
-      const words = text.split(" ");
-      let currentLine = "";
-
-      for (let i = 0; i < words.length; i++) {
-        const testLine = currentLine + words[i] + " ";
-        const metrics = ctx.measureText(testLine);
-
-        if (metrics.width > maxWidth && i > 0) {
-          ctx.fillText(currentLine, 80, y);
-          currentLine = words[i] + " ";
-          y += 32;
-        } else {
-          currentLine = testLine;
-        }
-      }
-
-      ctx.fillText(currentLine, 80, y);
-      y += 32;
+    const statusPalette: Record<string, { bg: string; text: string }> = {
+      Pending: { bg: "#FEF3C7", text: "#92400E" },
+      "In Progress": { bg: "#DBEAFE", text: "#1D4ED8" },
+      Completed: { bg: "#DCFCE7", text: "#166534" },
+      Delivered: { bg: "#E5E7EB", text: "#111827" },
     };
 
+    const statusColors =
+      statusPalette[job.status] || statusPalette.Pending;
+
+    ctx.fillStyle = "#f4f6fb";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    roundRect(ctx, 20, 20, 1560, 1040, 28);
+    ctx.clip();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(20, 20, 1560, 1040);
+    ctx.drawImage(themeImage, 1380, 20, 200, 1040);
+    ctx.restore();
+
+    ctx.drawImage(logo, 70, 92, 430, 120);
+
+    ctx.fillStyle = "#6B7280";
+    ctx.font = "500 28px Arial";
+    ctx.fillText("All IT Solutions & Services", 78, 240);
+
+    ctx.fillStyle = "#111827";
+    ctx.font = "bold 62px Arial";
+    ctx.fillText("JOB SHEET", 1095, 155);
+
+    ctx.fillStyle = "#E91E63";
+    ctx.font = "bold 42px Arial";
+    ctx.fillText(`# ${job.jobSheetNumber}`, 1192, 222);
+
+    ctx.strokeStyle = "#EEF2F7";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(78, 300);
+    ctx.lineTo(1420, 300);
+    ctx.stroke();
+
+    drawLaptopWatermark();
+
+    const labelX = 78;
+    const valueX = 385;
+    const infoTop = 390;
+    const rowGap = 92;
+    const contactLabelX = 860;
+    const contactValueX = 1020;
+    const labelFont = "bold 28px Arial";
+    const valueFont = "500 36px Arial";
+    const valueLineHeight = 40;
+
+    ctx.fillStyle = "#475569";
+    ctx.font = labelFont;
+    ctx.fillText("CUSTOMER NAME:-", labelX, infoTop);
+    ctx.fillText("CONTACT:-", contactLabelX, infoTop);
+
+    ctx.fillStyle = "#1F2937";
+    ctx.font = valueFont;
+    wrapText(job.customerName || "-", valueX, infoTop + 4, 380, valueLineHeight);
+    wrapText(job.contactNumber || "-", contactValueX, infoTop + 4, 220, valueLineHeight);
+
+    const rows = [
+      { label: "DEVICE/WORK:-", value: `${job.deviceType} (${job.brandName || "-"})`, maxWidth: 700 },
+      { label: "ISSUES/SERVICE:-", value: formattedIssues, maxWidth: 700 },
+      { label: "ATTENDED BY:-", value: job.attendedBy || "-", maxWidth: 700 },
+    ];
+
+    let currentRowY = infoTop + rowGap;
+    let attendedByBottomY = currentRowY;
+
+    rows.forEach((row, index) => {
+      ctx.fillStyle = "#475569";
+      ctx.font = labelFont;
+      ctx.fillText(row.label, labelX, currentRowY);
+
+      ctx.fillStyle = "#1F2937";
+      ctx.font = valueFont;
+      const textBottomY = wrapText(
+        row.value,
+        valueX,
+        currentRowY + 4,
+        row.maxWidth,
+        valueLineHeight
+      );
+
+      if (index === rows.length - 1) {
+        attendedByBottomY = textBottomY;
+      }
+
+      currentRowY = textBottomY + 48;
+    });
+
+    const estimatedCostLabelY = attendedByBottomY + 72;
+    const estimatedCostValueY = estimatedCostLabelY + 18;
+    const statusLabelY = estimatedCostLabelY + 95;
+    const statusBadgeY = statusLabelY - 35;
+    const statusTextY = statusLabelY + 1;
+    const footerLineY = Math.max(statusLabelY + 70, 905);
+    const footerTextY = footerLineY + 60;
+    const footerThanksY = footerLineY + 97;
+
+    ctx.fillStyle = "#475569";
+    ctx.font = labelFont;
+    ctx.fillText("ESTIMATED COST:-", labelX, estimatedCostLabelY);
+
+    ctx.fillStyle = "#111111";
+    ctx.font = "bold 45px Arial";
+    ctx.fillText(`₹ ${new Intl.NumberFormat("en-IN").format(job.estimatedCost ?? 0)}`, valueX, estimatedCostValueY);
+
+    ctx.fillStyle = "#475569";
+    ctx.font = labelFont;
+    ctx.fillText("STATUS:-", labelX, statusLabelY);
+
+    roundRect(ctx, valueX, statusBadgeY, 190, 52, 26);
+    ctx.fillStyle = statusColors.bg;
+    ctx.fill();
+
+    ctx.fillStyle = statusColors.text;
     ctx.font = "bold 28px Arial";
-    ctx.fillText("FTT Repair Job Card", 220, 60);
+    ctx.fillText(job.status.toUpperCase(), valueX + 22, statusTextY);
 
-    ctx.font = "20px Arial";
+    ctx.fillStyle = "#FFFFFF";
+    roundRect(ctx, 1140, 405, 310, 310, 26);
+    ctx.fill();
 
-    line(`Job Sheet No: ${job.jobSheetNumber}`);
-    line(`Customer: ${job.customerName}`);
-    line(`Phone: ${job.contactNumber}`);
-    line(`Device: ${job.deviceType}`);
-    line(`Brand: ${job.brandName}`);
+    ctx.drawImage(qrImage, 1154, 419, 284, 284);
 
-    line(
-      `Issues: ${Array.isArray(job.issues)
-        ? job.issues.join(", ")
-        : job.issues
-      }`
+    ctx.fillStyle = "#1F2937";
+    ctx.font = "bold 28px Arial";
+    ctx.fillText("Scan for More Info", 1172, 748);
+
+    ctx.strokeStyle = "#EEF2F7";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(78, footerLineY);
+    ctx.lineTo(1420, footerLineY);
+    ctx.stroke();
+
+    ctx.fillStyle = "#9CA3AF";
+    ctx.font = "500 20px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(
+      "I hereby acknowledge that I am bound by FTT REPAIRING CENTER terms and conditions.",
+      760,
+      footerTextY
     );
 
-    line(`Estimated Cost: ₹${job.estimatedCost ?? 0}`);
-    line(`Status: ${job.status}`);
+    ctx.fillStyle = "#6B7280";
+    ctx.font = "bold 22px Arial";
+    ctx.fillText(
+      "Thank you for choosing Furtherance Technotree.",
+      760,
+      footerThanksY
+    );
+    ctx.textAlign = "start";
 
     // Convert to compressed JPEG
     const blob: Blob | null = await new Promise(

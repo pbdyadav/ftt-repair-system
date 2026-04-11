@@ -103,6 +103,9 @@ ${billURL}
 
 Payment Mode: ${paymentMode}
 
+Share your feedback:
+https://g.page/r/Cb1PlUzb7PkzEAE/review
+
 Thank you for choosing FTT Repairing Center.`;
 
       const phone =
